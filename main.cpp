@@ -12,42 +12,50 @@ public:
 	{
 		float x1;
 		float x2;
-		bool isQuadraticRoot = false;
+		bool isQR;
+		bool isC;
 	public:
-		float getX() const { return x1; }
-		float getX1() const { return x1; }
-		float getX2() const { if (!isQuadraticRoot) throw Root{ 0, 0 }; return x2; }
+		float getX() const { if (isC) throw this;  return x1; }
+		float getX1() const { if (isC) throw this;  return x1; }
+		float getX2() const { if (!isQR || isC) throw Root{ 0, 0 }; return x2; }
+
+		bool isQuadraticRoot() const { return isQR; }
+		bool isClear() const { return isC; }
 		
-		Root(float value) : x1(value), x2(0), isQuadraticRoot(false) {};
-		Root(float value1, float value2) : x1(value1), x2(value2), isQuadraticRoot(true) {};
+		Root() : x1(0), x2(0), isQR(false), isC(true) {};
+		Root(float value) : x1(value), x2(0), isQR(false), isC(false) {};
+		Root(float value1, float value2) : x1(value1), x2(value2), isQR(true), isC(false) {};
 		friend std::ostream& operator<<(std::ostream& out, const Root& root)
 		{
-			out << root.x1;
-			if (root.isQuadraticRoot)
-			{
+			if (root.isClear())
+				return out << "[ None ]";
+
+			out << '[' << root.x1;
+			if (root.isQuadraticRoot())
 				out << " : " << root.x2;
-			}
-			return out;
+			return out << ']';
 		}
 	};
 
-	Equation(float pValueA, float pValueB) : a(pValueA), b(pValueB) {};
+	Equation(float pValueA, float pValueB) : a(pValueA), b(pValueB) { if (pValueA == 0) throw std::invalid_argument("A can`t be 0"); };
 	virtual Equation::Root equationRoot() const = 0;
+
+	virtual std::ostream& print(std::ostream& out = std::cout) const = 0;
+	friend std::ostream& operator<<(std::ostream& out, const Equation& eq) { return eq.print(out); }
 };
 
 class LinearEquation : public Equation
 {
 public:
 	LinearEquation(float pValueA, float pValueB) : Equation(pValueA, pValueB) {}
-	Equation::Root equationRoot() const override final;
-};
+	Root equationRoot() const override final;
 
+	std::ostream& print(std::ostream& out = std::cout) const override { return out << '(' << a << "x + " << b << ')'; }
+};
 
 Equation::Root LinearEquation::equationRoot() const
 {
-	if (a < 0)
-		throw Equation::Root{0, 0};
-	return Equation::Root{-b / a};
+	return Root{-b / a};
 }
 
 class QuadraticEquation : public Equation
@@ -57,42 +65,39 @@ private:
 public:
 	QuadraticEquation(float pValueA, float pValueB, float pValueC) : Equation(pValueA, pValueB), c(pValueC) {}
 	float delta() const { return b * b - 4 * a * c; }
-	Equation::Root equationRoot() const override final;
+	Root equationRoot() const override final;
+
+	std::ostream& print(std::ostream& out = std::cout) const override { return out << '(' << a << "x^2 + " << b << "x + " << c << ')'; }
 };
 
 Equation::Root QuadraticEquation::equationRoot() const
 {
 	float d = delta();
 	if (d < 0)
-	{
-		throw Equation::Root{ 0, 0 };
-	}
-	return Equation::Root{ (-b - sqrtf(d)) / (2 * a), (-b + sqrtf(d)) / (2 * a) };
+		return Root{};
+	float x1 = (-b - sqrtf(d)) / (2 * a);
+	float x2 = (-b + sqrtf(d)) / (2 * a);
+	return Root{ x1, x2  };
 }
 
 int main()
 {
 	LinearEquation lEq(5, 2);
-	std::cout << lEq.equationRoot().getX() << std::endl;
-
+	std::cout <<  lEq << " : " << lEq.equationRoot() << std::endl;
 	try
 	{
-		std::cout << lEq.equationRoot().getX2() << std::endl;
+		lEq.equationRoot().getX2();
 	}
-	catch (LinearEquation::Root)
+	catch (Equation::Root)
 	{
-		std::cout << "Second root is not existe" << std::endl;
+		std::cout << "X2 in root is not existe\n";
 	}
 
-	try
-	{
-		QuadraticEquation qEq(10, 3, 0);
-		std::cout << qEq.equationRoot();
-	}
-	catch (QuadraticEquation::Root)
-	{
-		std::cout << "Root is not exist";
-	}
+	QuadraticEquation qeq{ 10, 3, 0 };
+	std::cout << qeq << " : " << qeq.equationRoot() << std::endl;
+
+	QuadraticEquation qeqError(10, 3, 30);
+	std::cout << qeqError << " : " << qeqError.equationRoot() << std::endl;
 
 	return 0;
 }
